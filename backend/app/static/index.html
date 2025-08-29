@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MLOps Dashboard (MVP)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 20px; }
+    .row { display: flex; gap: 24px; flex-wrap: wrap; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; width: 360px; }
+    h2 { margin-top: 0; font-size: 18px; }
+    input, select, button, textarea { width: 100%; padding: 8px; margin: 6px 0; font-size: 14px; }
+    pre { background: #f8f8f8; padding: 8px; border-radius: 6px; overflow: auto; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .pill { display: inline-block; padding: 2px 8px; background: #eef; border-radius: 999px; font-size: 12px; margin-left: 6px; }
+    .muted { color: #666; font-size: 12px; }
+  </style>
+  <script>
+    async function fetchJSON(url, opts) {
+      const res = await fetch(url, opts);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    async function refreshModels() {
+      const data = await fetchJSON('/models');
+      const list = document.getElementById('models');
+      list.innerHTML = '';
+      const select = document.getElementById('deploySelect');
+      select.innerHTML = '';
+      data.models.forEach(m => {
+        const li = document.createElement('li');
+        li.textContent = `${m.name} (${m.id.slice(0,8)})`;
+        if (m.active) {
+          const pill = document.createElement('span');
+          pill.className = 'pill';
+          pill.textContent = 'active';
+          li.appendChild(pill);
+        }
+        const small = document.createElement('div');
+        small.className = 'muted';
+        small.textContent = `features: ${m.features.join(', ')}`;
+        li.appendChild(small);
+        list.appendChild(li);
+
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.name} (${m.id.slice(0,8)})`;
+        if (m.active) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    async function doUpload(ev) {
+      ev.preventDefault();
+      const fd = new FormData(ev.target);
+      try {
+        const m = await fetchJSON('/models/upload', { method: 'POST', body: fd });
+        alert('Uploaded: ' + m.name);
+        await refreshModels();
+      } catch (e) { alert('Upload failed: ' + e.message); }
+    }
+
+    async function doDeploy(ev) {
+      ev.preventDefault();
+      const id = document.getElementById('deploySelect').value;
+      try {
+        const m = await fetchJSON('/deploy/' + id, { method: 'POST' });
+        alert('Deployed: ' + m.name);
+        await refreshModels();
+      } catch (e) { alert('Deploy failed: ' + e.message); }
+    }
+
+    async function doPredict(ev) {
+      ev.preventDefault();
+      const body = document.getElementById('predictBody').value;
+      try {
+        const payload = JSON.parse(body);
+        const res = await fetchJSON('/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        document.getElementById('predictOut').textContent = JSON.stringify(res, null, 2);
+      } catch (e) { alert('Predict failed: ' + e.message); }
+    }
+
+    async function tickMetrics() {
+      try {
+        const m = await fetchJSON('/metrics');
+        document.getElementById('totalReq').textContent = m.total_requests;
+        document.getElementById('totalErr').textContent = m.total_errors;
+        document.getElementById('avgLat').textContent = m.avg_latency_ms.toFixed(2) + ' ms';
+        document.getElementById('p95Lat').textContent = m.p95_latency_ms.toFixed(2) + ' ms';
+        document.getElementById('perModel').textContent = JSON.stringify(m.per_model_requests, null, 2);
+      } catch (e) { /* ignore transient */ }
+    }
+
+    window.addEventListener('load', async () => {
+      document.getElementById('uploadForm').addEventListener('submit', doUpload);
+      document.getElementById('deployForm').addEventListener('submit', doDeploy);
+      document.getElementById('predictForm').addEventListener('submit', doPredict);
+      await refreshModels();
+      await tickMetrics();
+      setInterval(tickMetrics, 5000);
+    });
+  </script>
+  </head>
+<body>
+  <h1>MLOps Dashboard (MVP)</h1>
+  <div class="row">
+    <div class="card">
+      <h2>Upload Model</h2>
+      <form id="uploadForm">
+        <label>Name</label>
+        <input name="name" placeholder="my-model" required />
+        <label>Features (comma separated)</label>
+        <input name="features_csv" placeholder="f1, f2, f3" required />
+        <label>Pickle File (.pkl)</label>
+        <input type="file" name="model" accept=".pkl,.pickle" required />
+        <button>Upload</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Deploy Model</h2>
+      <form id="deployForm">
+        <label>Choose Model</label>
+        <select id="deploySelect"></select>
+        <button>Deploy</button>
+      </form>
+      <h3>Registered Models</h3>
+      <ul id="models"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Predict (Test)</h2>
+      <form id="predictForm">
+        <label>Request Body</label>
+        <textarea id="predictBody" rows="8">{ "rows": [ { "f1": 1, "f2": 2 } ] }</textarea>
+        <button>Send</button>
+      </form>
+      <h3>Response</h3>
+      <pre id="predictOut"></pre>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top: 16px;">
+    <div class="card">
+      <h2>Metrics</h2>
+      <div class="stats">
+        <div>Total Requests</div><div id="totalReq">0</div>
+        <div>Total Errors</div><div id="totalErr">0</div>
+        <div>Avg Latency</div><div id="avgLat">0 ms</div>
+        <div>P95 Latency</div><div id="p95Lat">0 ms</div>
+      </div>
+      <h3>Per-Model Requests</h3>
+      <pre id="perModel">{}</pre>
+    </div>
+  </div>
+</body>
+</html>
+
