@@ -63,6 +63,73 @@ class Metrics:
                 "started_at": self.started_at,
             }
 
+    def _reset_counters_unlocked(self) -> None:
+        self.total_requests = 0
+        self.total_errors = 0
+        self.latencies_ms = []
+        self.per_model_requests = {}
+        self.per_model_errors = {}
+
+    def rebuild_from_log(self) -> None:
+        """Recompute all aggregates by reading the requests log file."""
+        with self._lock:
+            self._reset_counters_unlocked()
+            if not os.path.exists(self.log_path):
+                return
+            try:
+                with open(self.log_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            entry = json.loads(line)
+                        except Exception:
+                            continue
+                        self.total_requests += 1
+                        ok = bool(entry.get("ok", False))
+                        if not ok:
+                            self.total_errors += 1
+                        mid = str(entry.get("model_id", "-"))
+                        self.per_model_requests[mid] = self.per_model_requests.get(mid, 0) + 1
+                        if not ok:
+                            self.per_model_errors[mid] = self.per_model_errors.get(mid, 0) + 1
+                        lat = float(entry.get("latency_ms", 0.0))
+                        self.latencies_ms.append(lat)
+            except Exception:
+                # Ignore rebuild errors; metrics will just reset
+                pass
+
+    def purge_model_data(self, model_id: str) -> None:
+        """Remove all log lines for a model and rebuild counters."""
+        with self._lock:
+            if not os.path.exists(self.log_path):
+                # Nothing to purge
+                self.per_model_requests.pop(model_id, None)
+                self.per_model_errors.pop(model_id, None)
+                return
+            tmp_path = self.log_path + ".tmp"
+            try:
+                with open(self.log_path, "r", encoding="utf-8") as src, open(tmp_path, "w", encoding="utf-8") as dst:
+                    for line in src:
+                        try:
+                            entry = json.loads(line)
+                            if str(entry.get("model_id")) == model_id:
+                                continue  # skip
+                        except Exception:
+                            # Keep malformed lines
+                            pass
+                        dst.write(line)
+                # Replace atomically
+                os.replace(tmp_path, self.log_path)
+            except Exception:
+                # Best effort; clean tmp if exists
+                try:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except Exception:
+                    pass
+            # Clear per-model quick views and rebuild everything from file
+            self._reset_counters_unlocked()
+        # Rebuild outside the file write block
+        self.rebuild_from_log()
+
 
 metrics = Metrics()
-

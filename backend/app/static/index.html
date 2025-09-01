@@ -4,17 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MLOps Dashboard (MVP)</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 20px; }
-    .row { display: flex; gap: 24px; flex-wrap: wrap; }
-    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; width: 360px; }
-    h2 { margin-top: 0; font-size: 18px; }
-    input, select, button, textarea { width: 100%; padding: 8px; margin: 6px 0; font-size: 14px; }
-    pre { background: #f8f8f8; padding: 8px; border-radius: 6px; overflow: auto; }
-    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .pill { display: inline-block; padding: 2px 8px; background: #eef; border-radius: 999px; font-size: 12px; margin-left: 6px; }
-    .muted { color: #666; font-size: 12px; }
-  </style>
+  <link rel="stylesheet" href="/static/styles.css" />
   <script>
     async function fetchJSON(url, opts) {
       const res = await fetch(url, opts);
@@ -95,6 +85,17 @@
     window.addEventListener('load', async () => {
       document.getElementById('uploadForm').addEventListener('submit', doUpload);
       document.getElementById('deployForm').addEventListener('submit', doDeploy);
+      document.getElementById('deleteBtn').addEventListener('click', async () => {
+        const id = document.getElementById('deploySelect').value;
+        if (!id) { alert('No model selected'); return; }
+        if (!confirm('Delete selected model and its metrics? This cannot be undone.')) return;
+        try {
+          await fetchJSON('/models/' + id, { method: 'DELETE' });
+          alert('Deleted model');
+          await refreshModels();
+          await tickMetrics();
+        } catch (e) { alert('Delete failed: ' + e.message); }
+      });
       document.getElementById('predictForm').addEventListener('submit', doPredict);
       await refreshModels();
       await tickMetrics();
@@ -103,7 +104,12 @@
   </script>
   </head>
 <body>
-  <h1>MLOps Dashboard (MVP)</h1>
+  <div class="glow-bg"></div>
+  <div class="container">
+  <header class="header">
+    <h1 class="title">MLOps Dashboard</h1>
+    <p class="subtitle">Manage models, deploy, and observe metrics</p>
+  </header>
   <div class="row">
     <div class="card">
       <h2>Upload Model</h2>
@@ -114,7 +120,7 @@
         <input name="features_csv" placeholder="f1, f2, f3" required />
         <label>Pickle File (.pkl)</label>
         <input type="file" name="model" accept=".pkl,.pickle" required />
-        <button>Upload</button>
+        <button class="btn primary">Upload</button>
       </form>
     </div>
 
@@ -123,7 +129,10 @@
       <form id="deployForm">
         <label>Choose Model</label>
         <select id="deploySelect"></select>
-        <button>Deploy</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn secondary" type="submit">Deploy</button>
+          <button class="btn danger" id="deleteBtn" type="button">Delete</button>
+        </div>
       </form>
       <h3>Registered Models</h3>
       <ul id="models"></ul>
@@ -134,7 +143,7 @@
       <form id="predictForm">
         <label>Request Body</label>
         <textarea id="predictBody" rows="8">{ "rows": [ { "f1": 1, "f2": 2 } ] }</textarea>
-        <button>Send</button>
+        <button class="btn primary">Send</button>
       </form>
       <h3>Response</h3>
       <pre id="predictOut"></pre>
@@ -153,6 +162,8 @@
       <h3>Per-Model Requests</h3>
       <pre id="perModel">{}</pre>
     </div>
+  </div>
+  <footer class="footer">Running on FastAPI • UVicorn • MVP</footer>
   </div>
 </body>
 </html>

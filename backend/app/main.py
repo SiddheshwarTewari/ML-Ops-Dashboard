@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .metrics import metrics
 from .model_manager import manager
 from .schemas import PredictRequest, PredictResponse, ModelsList, ModelMeta
-from .storage import ensure_dirs, list_models, save_uploaded_model, set_active_model, get_active_model
+from .storage import ensure_dirs, list_models, save_uploaded_model, set_active_model, get_active_model, delete_model, get_model
 
 
 app = FastAPI(title="MLOps Dashboard (MVP)")
@@ -90,4 +90,19 @@ def predict(req: PredictRequest):
 def get_metrics():
     return JSONResponse(metrics.snapshot())
 
+
+@app.delete("/models/{model_id}")
+def delete_model_endpoint(model_id: str):
+    # Ensure it exists
+    meta = get_model(model_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="Model not found")
+    ok = delete_model(model_id)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to delete model")
+    # Clear loaded model if needed
+    manager.ensure_active_loaded()
+    # Purge metrics/log entries for this model
+    metrics.purge_model_data(model_id)
+    return JSONResponse({"status": "deleted", "model_id": model_id})
 

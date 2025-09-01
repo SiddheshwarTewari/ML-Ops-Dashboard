@@ -1,15 +1,1 @@
-{
-  "9181920c-23cf-48be-af57-ea247e02c274": {
-    "id": "9181920c-23cf-48be-af57-ea247e02c274",
-    "name": "demo-logreg",
-    "features": [
-      "f1",
-      "f2",
-      "f3",
-      "f4"
-    ],
-    "created_at": 1756510781.2489483,
-    "path": "/app/data/model_store/9181920c-23cf-48be-af57-ea247e02c274/model.pkl",
-    "active": true
-  }
-}
+{}

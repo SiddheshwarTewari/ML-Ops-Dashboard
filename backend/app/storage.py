@@ -5,6 +5,7 @@ import os
 import time
 import uuid
 from typing import Dict, List, Optional
+import shutil
 
 from .schemas import ModelMeta
 
@@ -77,4 +78,31 @@ def save_uploaded_model(name: str, features: List[str], file_bytes: bytes) -> Mo
     _write_meta(models)
     return meta
 
+
+def get_model(model_id: str) -> Optional[ModelMeta]:
+    models = _read_meta()
+    return models.get(model_id)
+
+
+def delete_model(model_id: str) -> bool:
+    """Delete a model's metadata and files. If it was active, no model remains active."""
+    models = _read_meta()
+    meta = models.pop(model_id, None)
+    if meta is None:
+        return False
+    # Remove files on disk
+    try:
+        model_dir = os.path.dirname(meta.path)
+        if os.path.isdir(model_dir):
+            shutil.rmtree(model_dir, ignore_errors=True)
+    except Exception:
+        # Best-effort deletion of files; continue to persist metadata removal
+        pass
+    # Ensure no other model accidentally left active if the deleted was active
+    if meta.active:
+        # No model is set active now
+        for m in models.values():
+            m.active = False
+    _write_meta(models)
+    return True
 
