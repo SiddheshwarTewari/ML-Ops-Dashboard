@@ -25,10 +25,16 @@ Example Usage
   - Test predictions via the Predict panel using JSON.  
       - For example, input for Predict panel for provided logreg.pkl model:  
          `{`  
-            &ensp;`"rows": [`   
-               &emsp;`{ "f1": 5.1, "f2": 3.5, "f3": 1.4, "f4": 0.2 }`    
-            &ensp;`]`    
-         `}`    
+            &emsp;`"rows": [`   
+               &emsp;&emsp;`{ "f1": 5.1, "f2": 3.5, "f3": 1.4, "f4": 0.2 }`    
+            &emsp;`]`    
+         `}`   
+         {
+            "rows": [
+               { "f1": 5.1, "f2": 3.5, "f3": 1.4, "f4": 0.2 }
+            ]
+         }
+ 
 
 Docker
 - Build: `docker build -t mlops-dashboard .`
