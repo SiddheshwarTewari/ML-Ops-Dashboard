@@ -19,16 +19,16 @@ Example Usage
 - Train any scikit-learn model and save it as `.pkl`.
 - From the dashboard:
   - Upload the `.pkl`, provide a model name and features in the order expected by the model (e.g., `sepal_length,sepal_width,petal_length,petal_width`).
-      - For example, input for feature for provided logreg.pkl model:
+      - For example, input for feature for provided logreg.pkl model:  
          `f1, f2, f3, f4`
   - Deploy the model from the dropdown.
   - Test predictions via the Predict panel using JSON.  
-      - For example, input for Predict panel for provided logreg.pkl model: 
-         `{`
-            `"rows": [`
-               `{ "f1": 5.1, "f2": 3.5, "f3": 1.4, "f4": 0.2 }`
-            `]`
-         `}`
+      - For example, input for Predict panel for provided logreg.pkl model:  
+         `{`  
+            `"rows": [`  
+               `{ "f1": 5.1, "f2": 3.5, "f3": 1.4, "f4": 0.2 }`  
+            `]`  
+         `}`  
 
 Docker
 - Build: `docker build -t mlops-dashboard .`
